@@ -3,6 +3,8 @@ import os
 import subprocess
 from openpyxl import Workbook
 FFPROBE_PATH = "/usr/local/bin/ffprobe"
+import tkinter as tk
+from tkinter import filedialog, simpledialog, messagebox
 
 def get_video_metadata(file_path):
     try:
@@ -28,8 +30,17 @@ def get_video_metadata(file_path):
                 aspect_ratio = "Error"
         else:
             width = height = aspect_ratio = "Error"
-
+        
         frame_rate_str = output[2].strip() if len(output) >= 3 and output[2] else "Error"
+        try:
+            if '/' in frame_rate_str:
+                num, denom = frame_rate_str.split('/')
+                frame_rate = round(float(num) / float(denom), 2)
+            else:
+                frame_rate = float(frame_rate_str)
+        except Exception:
+            frame_rate = "Error"
+
 
         command_duration = [
             FFPROBE_PATH, "-v", "error", "-show_entries", "format=duration",
@@ -46,36 +57,56 @@ def get_video_metadata(file_path):
         except ValueError:
             duration = "Error"
 
-        return duration, frame_rate_str, width, height, aspect_ratio
+        return duration, frame_rate, width, height, aspect_ratio
+
     
     except Exception as e:
         print(f"Error processing file {file_path}: {e}")
         return str(e), str(e), "Error", "Error", "Error"
 
-def get_folder_path(prompt="Enter folder path"):
-    folder_path = input(prompt + ": ")
-    while not os.path.isdir(folder_path):
-        print("Invalid path. Please try again.")
-        folder_path = input(prompt + ": ")
+def get_folder_path(prompt="Select folder"):
+    root = tk.Tk()
+    root.withdraw() 
+    folder_path = filedialog.askdirectory(title=prompt)
+    if not folder_path:
+        print("No folder selected. Exiting.")
+        exit()
+    root.quit()  
+    root.destroy()  
     return folder_path
 
-def ask_preserve_subfolders():
-    choice = input("Do you want to keep the subfolder structure in the destination folder? (yes/no): ").strip().lower()
-    while choice not in ["yes", "no", "y", "n"]:
-        print("Invalid input. Please enter 'yes', 'no', 'y' or 'n'.")
-        choice = input("Do you want to keep the subfolder structure in the destination folder? (yes/no): ").strip().lower()
-    return choice in ["yes", "y"]
 
-# Main code
+def ask_preserve_subfolders():
+    root = tk.Tk()
+    root.withdraw()
+    result = messagebox.askyesno("Preserve Subfolders", "Do you want to keep the subfolder structure in the destination folder?")
+    root.quit()  
+    root.destroy()
+    return result
+
+def ask_for_extension():
+    root = tk.Tk()
+    root.withdraw()  
+    ext = simpledialog.askstring("File Extension", "Enter the file extension you want to process (e.g., mp4, mov):")
+    if not ext:
+        messagebox.showwarning("Missing Extension", "No extension entered. Exiting.")
+        root.quit()  
+        root.destroy()  
+        exit()
+    ext = ext.strip().lower()
+    if not ext.startswith('.'):
+        ext = '.' + ext
+    root.quit()  
+    root.destroy() 
+    return ext
+
 if __name__ == '__main__':
-    source_folder = get_folder_path("Enter the source folder path")
-    destination_folder = get_folder_path("Enter the destination folder path")
+    source_folder = get_folder_path("Select the source folder")
+    destination_folder = get_folder_path("Select the destination folder")
 
     preserve_subfolders = ask_preserve_subfolders()
 
-    extension_to_process = input("Enter the file extension you want to process (example: mp4, mov, mopv): ").strip().lower()
-    if not extension_to_process.startswith('.'):
-        extension_to_process = '.' + extension_to_process
+    extension_to_process = ask_for_extension()
 
     copied_files = 0
     omitted_files = 0
